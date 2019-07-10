@@ -1,5 +1,7 @@
 # Examples for <br> "Building Stateful Streaming Applications with Apache Flink"
 
+[![Build Status](https://travis-ci.org/jvk243/flink-calculation-travisci.svg?branch=master)](https://travis-ci.org/jvk243/flink-calculation-travisci)
+
 This repository contains three example applications that are discussed
 in the blog post *"Building Stateful Streaming Applications with Apache
 Flink"*. The post presents [Apache Flink's](https://flink.apache.org)
