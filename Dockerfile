@@ -20,12 +20,12 @@ RUN ln -s ${FLINK_INSTALL_PATH}/flink-${FLINK_VERSION} ${FLINK_HOME} && \
     rm -rf /var/cache/apk/* && \
     echo Installed Flink ${FLINK_VERSION} to ${FLINK_HOME}
 
-COPY ci/docker-entrypoint.sh ${FLINK_HOME}/bin/
+COPY ci/docker_entrypoint.sh ${FLINK_HOME}/bin/
 
 # Additional output to console, allows gettings logs with 'docker-compose logs'
 COPY log4j.properties ${FLINK_HOME}/conf/
 
 # WORKDIR ${FLINK_HOME}/bin/
 
-ENTRYPOINT ["/opt/flink/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["/opt/flink/bin/docker_entrypoint.sh"]
 CMD ["sh", "-c"]

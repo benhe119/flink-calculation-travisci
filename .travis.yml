@@ -1,6 +1,86 @@
+# project language
 language: java
+
 jdk:
-  - openjdk8
   - oraclejdk8
 
-script: mvn clean install
+cache:
+  directories:
+    - $HOME/.m2
+
+# To use more customizable environment running in a virtual machine
+sudo: enabled
+
+# Ubuntu distribution to use as test environment
+dist: trusty
+
+# Travis CI uses the .travis.yml file from the branch containing the git commit that triggers the build.
+# Include branches using a safelist, or exclude them using a blocklist.
+branches:
+  only:
+    - master
+    - release
+    - /^DATA-\d+.*$/
+    - /^epic-DATA-\d+.*$/
+
+env:
+  # Environment variables available in all builds
+  global:
+    - DOCKER_IMAGE="${TRAVIS_REPO_SLUG}"
+    - DOCKER_USER="vijaykumar243"
+    # DOCKER_PASS
+    - secure: "isnfi7KwPRmZRrm25Z+LN7mGaKw7dee9/R9j8bRmbUqcS6lBghfOCv/SbO/AdqMXNNlTRZJbIZUTIE494gvw59rkCxu4i9Xi+oKgAAGCUDLgToqOp/ZhR4bEq2s43+P2Rmb4YaGrvnoy4XqDrfX5FIiHcsr2dSaaiEEclgHveR/ZKcdHQ5mS6wuTXslwNQDP7DpyuH7lpNOD5Pdg71YgsAlxk+mfpDi5UXzYLycuBnAkDPPMev2/q8ROyRe7FGx+vL/nYETewG8lpiGVFfrd5H/4oJw3oUe5/kVYmqzNqxtyu/ocO0jvqDkJb8aqPHTy1tZXDcL8ijS3qoxmiLg7keMvwyXnnubcjVw3kYfmDXgMxfB0z2szo5S0sx4zJRvSKaj/7fq8fvEBuqgug6W8UtemPHfBusVMTrX6PERg6x1DRGhZ0yxtTARVSVjPyv97WG1XmPWO5nkyNK2EJjjY00UB6W+dj8RiEBMylP0ob5z8sWlm8BEeYfOlYFQ00AG0mEOuIbb9uVXDrtfTazvQ4DyY4+xTOp/KnKgAnkDsi2jLCPepKaYBnAQ1/9rSQgVuw/ys0Gk1FnDkX6yMKMLGwXJ4FLKZlESXXf5cXUPZYvjoszkpAKy98w/3hwuiHgFEFoYdaef9lu2mHNSynBGr/+lMoxr4loIKJHmHdqpnHbM="
+
+# Install any dependencies requires by the project.
+# Note: Travis defaults to `mvn install` if unspecified.
+install:
+  - pip install awscli --upgrade --user
+  - aws --version
+
+# Travis CI clones repositories to a depth of 50 commits, which is only really useful if you are performing git operations, so
+# See https://docs.travis-ci.com/user/customizing-the-build#git-clone-depth
+git:
+  depth: false
+
+# Phase to run something before script phase.
+before_script:
+  # Force the jar version to be the TRAVIS_BUILD_NUMBER, ignoring the version defined in pom.xml
+  - mvn versions:set -DnewVersion="0.0.${TRAVIS_BUILD_NUMBER}"
+
+# Main section. This is where build and test command(s) are specified.
+# If tests pass, publish Docker image (note that we do this here because we want a failed Docker image publish to fail the entire build)
+script:
+  - mvn --batch-mode --show-version clean test package -Dmaven.test.skip=true
+
+deploy:
+  - provider: script
+    script: bash ci/deploy.sh dev
+    skip_cleanup: true
+    on:
+      all_branches: true
+      condition: $TRAVIS_BRANCH =~ ^(DATA-[0-9]+.*)|(epic-DATA-[0-9]+.*)$
+  - provider: script
+    script: bash ci/deploy.sh staging
+    skip_cleanup: true
+    on:
+      all_branches: true
+      condition: $TRAVIS_BRANCH == master
+  - provider: script
+    script: bash ci/deploy.sh prod
+    skip_cleanup: true
+    on:
+      all_branches: true
+      condition: $TRAVIS_BRANCH == release
+
+# Notify via Slack and team email list when a build breaks or has been fixed
+# See https://docs.travis-ci.com/user/notifications
+notifications:
+  slack:
+    on_success: always
+    rooms:
+      # team:<semi-secret token>#notifications
+      - secure: "i5lLaO2EdzA0N8ky0sXIwt3HdN2UZYzMLmjbBL0oYkt8wRgvrqgi8WwdU337qa47MjNWjLFnFtLyPqJo7nHVxjzuXTrsnXrByqt5Tm+RbKe4JZNAS1mpoh/5JCHqVzkZOV0YZbybckTLAjhCOxNVUd/HOcJAxzhVbJT3iOFPimNRt1ow6UEQHdXKGjI+/Jiu4EyENP8VmVg7CFJDAdf6ibLOd0gUeDiNVQhVmZuceUYyIJwZ2MXsDERlb9PfTeoTyXH5nVJXO19+z7nVK4iRPsWK/DQvTjQgiURLn7sHJcGYG7Q/Cd32m1MVT89tb3no52lP/RLeCNGfd/6C/2svhAU5c8b6U+iL+oNwPP6W4vyxwNH0uwCZIIFDzkiia/anAl/kFChvny3rAaD3m8GOMLaHMCmzH65bK+2sLYTIHbi6ceuCYxwzq+VGBNDLYu5Tq5YcQN15ubz0xfdtNzl3B7Rrxs/tBL2SXyn24Tl74j+7Z7MOnuypYhrvnchYjAPaqMz4hNFUMKa+tNfuibTIO79BCocf98tlwfoXgnU8zckIJar23Pc+eUs9PgpbJOZvK/OGukfhcfiNNipNQjQ7TdOqn2w0c0LOwOv0EWQUZvEnPGmgWhPWxfDhHWpY5+tDpgbJCBBuaDn1jZWELHwwfxXlynd43/ltlE4k1cf4GGg="
+  # Send build failures (only) to author only, so they can deal with it. Note that this uses the failing commit author's email address.
+  email:
+    on_success: change
+    on_failure: always
